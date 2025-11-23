@@ -1,4 +1,4 @@
-# medbot_app.py
+# medbot_app.py (updated: patient chat widened, simple login, WhatsApp-style chat colors)
 import os
 import json
 import random
@@ -17,20 +17,190 @@ st.set_page_config(page_title="MedBot", page_icon="🩺", layout="wide")
 
 CHAT_CSS = """
 <style>
-.chat-wrapper { max-width: 1100px; margin: 0 auto; }
-.user-bubble { background:#DCF8C6; padding:12px; border-radius:12px; display:inline-block; margin:6px 0; color:#000; max-width:80%; }
-.bot-bubble { background:#F1F1F1; padding:12px; border-radius:12px; display:inline-block; margin:6px 0; color:#000; max-width:80%; }
-.meta { font-size:0.8rem; color:#444; margin-bottom:6px; font-weight:600; }
-.header-space { margin-top:10px; margin-bottom:10px; }
-.app-card { background: #ffffff; border-radius:10px; padding:12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); margin-bottom:14px; }
-.status-pill { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:600; }
-.status-pending { background:#FFF3CD; color:#856404; }
-.status-accepted { background:#D4EDDA; color:#155724; }
-.status-rejected { background:#F8D7DA; color:#721C24; }
-.small-muted { font-size:0.85rem; color:#666; }
+:root{
+  --card-bg: #ffffff;
+  --muted: #6c757d;
+  --accent: #0b74de;
+  --success: #28a745;
+  --danger: #dc3545;
+  --soft: rgba(11,116,222,0.06);
+  --glass: rgba(255,255,255,0.85);
+}
+
+/* basic card / bubble styles */
+.app-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(10,20,40,0.04);
+  border: 1px solid rgba(10,15,30,0.03);
+  margin-bottom: 12px;
+}
+.header-space { height: 18px; }
+
+/* WhatsApp-like chat bubbles */
+/* User bubble (right) - WhatsApp green */
+.user-bubble {
+  background: #c6f6d5;  /* light green bubble */
+  color: #000000;       /* black text */
+  padding: 12px 16px;
+  border-radius: 14px;
+  margin: 8px 0;
+  max-width: 78%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.04);
+  font-size: 1rem;
+}
+
+
+/* Bot bubble (left) - light neutral */
+.bot-bubble {
+  display: inline-block;
+  max-width: 78%;
+  background: #f1f0f0; /* light grey similar to chat apps */
+  border-radius: 18px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  color: #051428; /* dark text */
+  box-shadow: 0 6px 18px rgba(10,20,40,0.03);
+  align-self: flex-start;
+  word-wrap: break-word;
+  line-height: 1.35;
+}
+
+/* small meta label above bubbles */
+.meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+
+/* history card */
+.history-card {
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid rgba(10,15,30,0.04);
+  margin-bottom: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,1), rgba(250,252,255,1));
+}
+.status-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+
+/* status pills */
+.status-pill { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:600; background:rgba(0,0,0,0.04); }
+.status-accepted { background: rgba(40,167,69,0.12); color: #166534; }
+.status-rejected { background: rgba(220,53,69,0.10); color: #7a1f2b; }
+.status-pending { background: rgba(255,193,7,0.10); color: #6b4f00; }
+
+/* ensure content sits above blobs if present */
+.app-card, .history-card, .bot-bubble, .user-bubble, .stButton, .stTextInput {
+  position: relative;
+  z-index: 2;
+}
+
+/* responsive tweaks */
+@media (max-width: 800px) {
+  .bot-bubble, .user-bubble { max-width: 94%; }
+}
 </style>
 """
+
 st.markdown(CHAT_CSS, unsafe_allow_html=True)
+
+# Limit main content width & style a centered login card
+NARROW_CSS = """
+<style>
+.block-container {
+  max-width: 760px;    /* default; admin view overrides later when admin logged in */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.login-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 8px 30px rgba(10,20,40,0.06);
+  border: 1px solid rgba(10,15,30,0.03);
+  margin: 12px auto;
+  max-width: 720px;
+}
+@media (max-width:800px){
+  .block-container { padding-left: 8px; padding-right: 8px; max-width: 98vw; }
+  .login-card { padding: 12px; }
+}
+</style>
+"""
+st.markdown(NARROW_CSS, unsafe_allow_html=True)
+
+# Background hero (kept in CSS but we'll hide the flashy parts via SIMPLE_LOGIN_CSS)
+BG_CSS = """
+<style>
+.login-hero {
+  position: fixed;
+  inset: 0;
+  z-index: 0; /* behind content & blobs */
+  background-image: linear-gradient(180deg, rgba(250,253,255,0.85), rgba(255,255,255,0.95)), url("login_bg.svg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.login-card { position: relative; z-index: 2; }
+.login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.5));
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* floating blurred blobs (decorative) */
+:root { --blob-1: rgba(11,116,222,0.10); --blob-2: rgba(45,165,255,0.08); }
+.bg-blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(40px);
+  transform: translate3d(0,0,0);
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: screen;
+}
+.bg-blob.b1 { width: 480px; height: 480px; left: -140px; top: -140px; background: var(--blob-1); animation: float1 12s ease-in-out infinite; }
+.bg-blob.b2 { width: 360px; height: 360px; right: -100px; bottom: -80px; background: var(--blob-2); animation: float2 14s ease-in-out infinite; }
+
+@keyframes float1 {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(20px) rotate(12deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes float2 {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(-8deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+</style>
+"""
+st.markdown(BG_CSS, unsafe_allow_html=True)
+
+# --- SIMPLE LOGIN CSS: hide flashy decorations and make login card plain/clean ---
+SIMPLE_LOGIN_CSS = """
+<style>
+/* hide the large background hero and decorative blobs for a minimal login */
+.login-hero { display: none !important; }
+.bg-blob { display: none !important; }
+
+/* simpler login card visuals */
+.login-card {
+  background: #ffffff !important;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+</style>
+"""
+st.markdown(SIMPLE_LOGIN_CSS, unsafe_allow_html=True)
+
+# NOTE: we intentionally DO NOT render the login hero or blob elements to remove flashy visuals.
 
 # -----------------------------
 # Load model + jsons
@@ -193,6 +363,7 @@ specialty_map = {
 }
 
 APPT_CSV = "appointments.csv"
+HISTORY_CSV = "patient_history.csv"
 
 # -----------------------------
 # appointment persistence
@@ -264,6 +435,49 @@ def update_appointment_status(patient, doctor_identifier, time_slot, new_status)
     return updated
 
 # -----------------------------
+# patient visit history helpers
+# -----------------------------
+def get_patient_visit_history(patient_id):
+    """Return past visits for a patient (Accepted or Completed)."""
+    appts = load_appointments()
+    visits = [a for a in appts if a.get("patient") == patient_id and a.get("status") in ("Accepted", "Completed")]
+    try:
+        visits_sorted = sorted(visits, key=lambda x: x.get("created_at") or "", reverse=True)
+    except Exception:
+        visits_sorted = visits
+    return visits_sorted
+
+def mark_appointment_completed(patient, doctor_username, time_slot):
+    """Set appointment status to Completed and append to history CSV."""
+    appts = load_appointments()
+    changed = False
+    for a in appts:
+        if a.get("patient") == patient and a.get("doctor_username") == doctor_username and a.get("time") == time_slot:
+            a["status"] = "Completed"
+            changed = True
+            break
+    if changed:
+        save_appointments(appts)
+        # Append to history CSV for permanent record
+        record = {
+            "patient": patient,
+            "doctor_username": doctor_username,
+            "time": time_slot,
+            "symptom": a.get("symptom"),
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        try:
+            if os.path.exists(HISTORY_CSV):
+                df = pd.read_csv(HISTORY_CSV)
+                df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+            else:
+                df = pd.DataFrame([record])
+            df.to_csv(HISTORY_CSV, index=False)
+        except Exception:
+            pass
+    return changed
+
+# -----------------------------
 # helper functions (bot + doctor rec)
 # -----------------------------
 def find_specialty(symptom):
@@ -276,6 +490,10 @@ def find_specialty(symptom):
     return "General Physician"
 
 def get_bot_response(user_input):
+    """
+    Predict intent -> return (reply_from_responses, predicted_tag_or_None, follow_ups_list_or_None)
+    Important: do NOT use follow-up text as the immediate bot reply.
+    """
     try:
         vec = vectorizer.transform([user_input.lower()])
         prediction = model.predict(vec)
@@ -286,13 +504,22 @@ def get_bot_response(user_input):
     if predicted_tag:
         for intent in intents.get('intents', []):
             if intent.get('tag') == predicted_tag:
-                resp_choices = intent.get('responses', [])
+                # reply must come from intent['responses'] only
+                resp_choices = intent.get('responses') or []
                 response = random.choice(resp_choices) if resp_choices else "Sorry, I don't understand."
-                fups = None
+                # collect follow-ups separately (always return list or None)
+                raw_fups = None
                 if predicted_tag in follow_ups:
-                    fups = follow_ups[predicted_tag]
-                elif intent.get('follow_up_questions'):
-                    fups = intent.get('follow_up_questions')
+                    raw_fups = follow_ups[predicted_tag]
+                else:
+                    raw_fups = intent.get('follow_up_questions')
+                # normalize follow-ups to list of non-empty strings or None
+                fups = None
+                if isinstance(raw_fups, (list, tuple)):
+                    cleaned = [str(x).strip() for x in raw_fups if str(x).strip()]
+                    fups = cleaned if cleaned else None
+                elif isinstance(raw_fups, str) and raw_fups.strip():
+                    fups = [raw_fups.strip()]
                 return response, predicted_tag, fups
     return "Sorry, I don't understand. Please describe your symptom clearly.", None, None
 
@@ -315,14 +542,17 @@ def recommend_doctors(symptom, top_n=3):
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'role' not in st.session_state: st.session_state.role = None
 if 'username' not in st.session_state: st.session_state.username = None
-if 'chat_history' not in st.session_state: st.session_state.chat_history = []
+if 'chat_history' not in st.session_state: st.session_state.chat_history = []  # list of {"user": str or None, "bot": str or None}
 if 'current_symptom' not in st.session_state: st.session_state.current_symptom = None
-if 'follow_up_questions' not in st.session_state: st.session_state.follow_up_questions = []
-if 'follow_up_index' not in st.session_state: st.session_state.follow_up_index = 0
+# follow-up state (queue + pending + answers)
+if 'follow_up_queue' not in st.session_state: st.session_state.follow_up_queue = []  # remaining questions
+if 'pending_follow_up' not in st.session_state: st.session_state.pending_follow_up = None  # current question displayed and waiting for answer
 if 'follow_up_answers' not in st.session_state: st.session_state.follow_up_answers = {}
 if 'asking_follow_up' not in st.session_state: st.session_state.asking_follow_up = False
 if 'symptoms_collected' not in st.session_state: st.session_state.symptoms_collected = []
 if 'appointments' not in st.session_state: st.session_state.appointments = load_appointments()
+# UI: patient history toggle
+if 'show_history' not in st.session_state: st.session_state.show_history = False
 
 # -----------------------------
 # UI helpers: chat bubbles (escape input)
@@ -331,13 +561,62 @@ def _render_user_bubble(text):
     if text is None:
         return
     safe = html.escape(str(text)).replace("\n", "<br>")
-    st.markdown(f"<div style='text-align:right'><div class='user-bubble'><div class='meta'>You</div>{safe}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='display:flex; justify-content:flex-end;'><div class='user-bubble'><div class='meta'>You</div>{safe}</div></div>", unsafe_allow_html=True)
 
 def _render_bot_bubble(text):
     if text is None:
         return
     safe = html.escape(str(text)).replace("\n", "<br>")
-    st.markdown(f"<div style='text-align:left'><div class='bot-bubble'><div class='meta'>MedBot</div>{safe}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='display:flex; justify-content:flex-start;'><div class='bot-bubble'><div class='meta'>MedBot</div>{safe}</div></div>", unsafe_allow_html=True)
+
+def _render_history_card(appt):
+    # appt: dict with patient, doctor, time, created_at, status, symptom
+    name = appt.get("patient")
+    doctor = appt.get("doctor") or appt.get("doctor_username")
+    # created_at may be ISO timestamp; show date if possible
+    created = appt.get("created_at")
+    date_str = ""
+    try:
+        if created:
+            dt = datetime.fromisoformat(created)
+            date_str = dt.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = created or ""
+    time_slot = appt.get("time", "")
+    status = appt.get("status", "Pending")
+    # color dot + label
+    if isinstance(status, str) and status.lower() in ("accepted", "approved"):
+        dot_color = "#28a745"  # green
+        status_label = "Approved"
+    elif isinstance(status, str) and status.lower() in ("rejected",):
+        dot_color = "#dc3545"  # red
+        status_label = "Rejected"
+    elif isinstance(status, str) and status.lower() in ("completed",):
+        dot_color = "#007bff"  # blue
+        status_label = "Completed"
+    else:
+        dot_color = "#ffc107"  # yellow
+        status_label = "Pending"
+
+    html_card = f"""
+    <div class="history-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:700; font-size:1rem;">{html.escape(str(name or ""))}</div>
+          <div class="small-muted">Doctor: {html.escape(str(doctor or ""))}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:600;">{html.escape(date_str)}</div>
+          <div class="small-muted">{html.escape(str(time_slot or ""))}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <span class="status-dot" style="background:{dot_color};"></span>
+        <span style="font-weight:600;">{status_label}</span>
+      </div>
+    </div>
+    """
+    st.markdown(html_card, unsafe_allow_html=True)
 
 # -----------------------------
 # UI: Header / Login
@@ -346,6 +625,8 @@ st.markdown("<div class='header-space'></div>", unsafe_allow_html=True)
 st.title("🩺 MedBot Healthcare Assistant")
 
 if not st.session_state.logged_in:
+    st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+
     st.subheader("Login")
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -362,12 +643,10 @@ if not st.session_state.logged_in:
             else:
                 username_input = st.text_input("Username (or full name)")
         else:
-            username_input = st.text_input("Username (doctors: choose name above or type username)")
+            username_input = st.text_input("Username")
         password = st.text_input("Password", type="password")
-    if user_type == "Doctor" and doctor_rows:
-        st.info("Choose your name from the dropdown to avoid typing the username. Demo doctors use password 'doctor_pass'.")
 
-    # Login handler
+    # Login handler (DO NOT output </div> inside this if)
     if st.button("Login"):
         username = username_input.strip() if isinstance(username_input, str) else username_input
         if not username:
@@ -406,6 +685,10 @@ if not st.session_state.logged_in:
                 else:
                     hint = " Use the dropdown to pick your name or type your username. Demo doctor password: 'doctor_pass'." if user_type == "Doctor" else ""
                     st.error("Invalid credentials or role mismatch." + hint)
+
+    # CLOSE login-card wrapper here (after handling login, outside the button block)
+    st.markdown("</div>", unsafe_allow_html=True)
+
 else:
     st.sidebar.success(f"Logged in as: {st.session_state.username} ({st.session_state.role})")
     if st.sidebar.button("Logout"):
@@ -414,81 +697,52 @@ else:
         st.rerun()
 
 # -----------------------------
-# PATIENT DASHBOARD
+# PATIENT DASHBOARD (modified width: chat area larger)
 # -----------------------------
 if st.session_state.logged_in and st.session_state.role == "Patient":
     st.subheader(f"Welcome, {st.session_state.username}!")
-    col_chat, col_side = st.columns([3, 1])
-
-    with col_side:
-        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-        st.markdown("### 📅 Latest Appointment")
-        last = get_latest_patient_appointment(st.session_state.username)
-        if last:
-            status = last.get("status", "Pending")
-            pill_class = "status-pending"
-            emoji = "⚪"
-            if status == "Accepted":
-                pill_class = "status-accepted"; emoji = "✅"
-            elif status == "Rejected":
-                pill_class = "status-rejected"; emoji = "❌"
-            st.markdown(f"<div class='status-pill {pill_class}'>{emoji} {status}</div>", unsafe_allow_html=True)
-            st.markdown(f"**Doctor:** {last.get('doctor') or last.get('doctor_username')}  \n**Time:** {last.get('time')}  \n**Symptom:** {last.get('symptom')}")
-        else:
-            st.write("No bookings yet.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if st.button("Clear Chat", key="clear_chat_main"):
-            st.session_state.chat_history = []
-            st.session_state.current_symptom = None
-            st.session_state.asking_follow_up = False
-            st.session_state.follow_up_index = 0
-            st.session_state.follow_up_answers = {}
-            st.session_state.symptoms_collected = []
-            st.rerun()
+    # Wider patient dashboard chat area (changed from [3,1] to [5,1])
+    col_chat, col_side = st.columns([10, 1])
 
     with col_chat:
         st.markdown("### 💬 Chat with MedBot")
-        # render history
+        # render history (chat bubbles)
         for chat in st.session_state.chat_history:
             if chat.get("user"):
                 _render_user_bubble(chat['user'])
             if chat.get("bot"):
                 _render_bot_bubble(chat['bot'])
 
-        # follow-up handling
-        if st.session_state.asking_follow_up:
-            idx = st.session_state.follow_up_index
-            fqs = st.session_state.follow_up_questions or []
-            if idx < len(fqs):
-                current_q = fqs[idx]
-                # ensure bot question present once
-                if not any(chat.get("bot") == current_q for chat in st.session_state.chat_history):
-                    st.session_state.chat_history.append({"user": None, "bot": current_q})
-                ans = st.text_input(current_q, key=f"fup_{idx}")
-                if st.button("Answer", key=f"ans_btn_{idx}") and ans.strip():
-                    st.session_state.chat_history.append({"user": ans.strip(), "bot": None})
-                    st.session_state.follow_up_answers[current_q] = ans.strip()
-                    st.session_state.follow_up_index += 1
-                    if st.session_state.follow_up_index < len(fqs):
-                        next_q = fqs[st.session_state.follow_up_index]
-                        if not any(chat.get("bot") == next_q for chat in st.session_state.chat_history):
-                            st.session_state.chat_history.append({"user": None, "bot": next_q})
-                    else:
-                        # finalize
-                        st.session_state.asking_follow_up = False
-                        symptom = st.session_state.current_symptom or " / ".join(st.session_state.follow_up_answers.values())
-                        username_display = st.session_state.username or "User"
-                        bot_msg = (f"Thank you, {username_display}. Based on what you’ve shared, "
-                                   f"it seems you’re experiencing symptoms related to {symptom}. "
-                                   "Here are some doctors who can help you.")
-                        st.session_state.chat_history.append({"user": None, "bot": bot_msg})
-                        st.session_state.symptoms_collected.append(symptom)
-                        st.session_state.follow_up_questions = []
-                        st.session_state.follow_up_index = 0
-                        st.session_state.follow_up_answers = {}
-            else:
-                st.session_state.asking_follow_up = False
+        # follow-up handling (single pending question + queue, no duplicates)
+        if st.session_state.asking_follow_up and st.session_state.pending_follow_up:
+            q = st.session_state.pending_follow_up
+            # ensure question appears in chat history exactly once
+            if not any(chat.get("bot") == q for chat in st.session_state.chat_history):
+                st.session_state.chat_history.append({"user": None, "bot": q})
+            ans = st.text_input(q, key=f"fup_{hash(q)}")
+            if st.button("Answer", key=f"ans_btn_{hash(q)}") and ans.strip():
+                # save user's answer once
+                st.session_state.chat_history.append({"user": ans.strip(), "bot": None})
+                st.session_state.follow_up_answers[q] = ans.strip()
+                # move to next follow-up in queue if available
+                if st.session_state.follow_up_queue:
+                    st.session_state.pending_follow_up = st.session_state.follow_up_queue.pop(0)
+                else:
+                    # finalize follow-ups
+                    st.session_state.pending_follow_up = None
+                    st.session_state.asking_follow_up = False
+                    symptom = st.session_state.current_symptom or " / ".join(st.session_state.follow_up_answers.values())
+                    username_display = st.session_state.username or "User"
+                    bot_msg = (f"Thank you, {username_display}. Based on what you’ve shared, "
+                               f"it seems you’re experiencing symptoms related to {symptom}. "
+                               "Here are some doctors who can help you.")
+                    st.session_state.chat_history.append({"user": None, "bot": bot_msg})
+                    st.session_state.symptoms_collected.append(symptom)
+                    # clear follow-up buffers (keep history)
+                    st.session_state.follow_up_queue = []
+                    st.session_state.follow_up_answers = {}
+                    st.session_state.current_symptom = None
+                st.rerun()
 
         else:
             if not st.session_state.symptoms_collected:
@@ -497,18 +751,29 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
                     with st.spinner("MedBot is thinking..."):
                         time.sleep(0.5)
                         bot_resp, predicted_tag, fups = get_bot_response(user_input)
+
+                    # === FIX: Avoid duplicating follow-up text as immediate bot reply ===
+                    # If follow-ups exist and the chosen bot_resp matches one of them,
+                    # replace bot_resp with a neutral acknowledgement so the follow-up queue
+                    # will present the questions (only once).
+                    if fups and any(str(bot_resp).strip() == str(q).strip() for q in fups):
+                        bot_resp = "Let me ask you a few questions so I can understand your issue clearly."
+
+                    # append user message and the immediate bot response (from intent.responses)
                     st.session_state.chat_history.append({"user": user_input.strip(), "bot": bot_resp})
                     st.session_state.current_symptom = predicted_tag or user_input.strip()
+                    # if follow-ups exist, initialize queue and show first question (do NOT use follow-ups as bot reply)
                     if fups:
-                        st.session_state.follow_up_questions = fups
-                        st.session_state.follow_up_index = 0
-                        st.session_state.follow_up_answers = {}
+                        st.session_state.follow_up_queue = [str(x).strip() for x in fups if str(x).strip()]
+                        st.session_state.pending_follow_up = st.session_state.follow_up_queue.pop(0) if st.session_state.follow_up_queue else None
                         st.session_state.asking_follow_up = True
+                        st.session_state.follow_up_answers = {}
                         # append first follow-up once
-                        first_q = fups[0] if fups else None
+                        first_q = st.session_state.pending_follow_up
                         if first_q and not any(chat.get("bot") == first_q for chat in st.session_state.chat_history):
                             st.session_state.chat_history.append({"user": None, "bot": first_q})
                     else:
+                        # no follow-ups: finalize immediately and show doctors
                         symptom = st.session_state.current_symptom
                         username_display = st.session_state.username or "User"
                         bot_msg = (f"Thank you, {username_display}. Based on what you’ve shared, "
@@ -534,19 +799,69 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
                         st.success(f"Appointment requested with **{doctor_display}** at **{slot}**. Status: {appt['status']}")
                         st.session_state.current_symptom = None
                         st.session_state.symptoms_collected = []
-                        st.session_state.follow_up_questions = []
-                        st.session_state.follow_up_index = 0
+                        st.session_state.follow_up_queue = []
+                        st.session_state.pending_follow_up = None
                         st.session_state.follow_up_answers = {}
                         st.session_state.asking_follow_up = False
                         st.rerun()
                 else:
                     st.write("No doctors found for that symptom — try rephrasing.")
 
+        # --- NEW: After chat area, show Latest Appointment + History (moved from side) ---
+        st.markdown("<div class='app-card' style='margin-top:14px'>", unsafe_allow_html=True)
+        st.markdown("### 📅 Latest Appointment")
+        last = get_latest_patient_appointment(st.session_state.username)
+        if last:
+            status = last.get("status", "Pending")
+            pill_class = "status-pending"
+            emoji = "⚪"
+            if status == "Accepted":
+                pill_class = "status-accepted"; emoji = "✅"
+            elif status == "Rejected":
+                pill_class = "status-rejected"; emoji = "❌"
+            st.markdown(f"<div class='status-pill {pill_class}'>{emoji} {status}</div>", unsafe_allow_html=True)
+            st.markdown(f"**Doctor:** {last.get('doctor') or last.get('doctor_username')}  \n**Time:** {last.get('time')}  \n**Symptom:** {last.get('symptom')}")
+        else:
+            st.write("No bookings yet.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ====== View Appointment History (moved under chat) ======
+        st.markdown("<div class='app-card' style='margin-top:10px'>", unsafe_allow_html=True)
+        if st.button("📜 View Appointment History", key="view_history_btn"):
+            st.session_state.show_history = not st.session_state.show_history
+        if st.session_state.show_history:
+            st.markdown("### 📜 Your Appointment History")
+            visits = get_patient_visit_history(st.session_state.username)
+            if visits:
+                for v in visits:
+                    _render_history_card(v)
+            else:
+                st.markdown("No past visits recorded.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Keep the Clear Chat button here as well
+        if st.button("Clear Chat", key="clear_chat_main"):
+            st.session_state.chat_history = []
+            st.session_state.current_symptom = None
+            st.session_state.asking_follow_up = False
+            st.session_state.follow_up_queue = []
+            st.session_state.pending_follow_up = None
+            st.session_state.follow_up_answers = {}
+            st.session_state.symptoms_collected = []
+            st.rerun()
+
+    # keep the original empty right column (or you can use it later)
+    with col_side:
+        # intentionally left blank so right column doesn't show duplicate content
+        st.write("")
+
 # -----------------------------
-# DOCTOR DASHBOARD
+# DOCTOR DASHBOARD (view appts + mark completed; search -> single patient history)
 # -----------------------------
 elif st.session_state.logged_in and st.session_state.role == "Doctor":
     doc_uname = st.session_state.username
+
+    # determine display name (reuse your existing logic)
     display_name = users.get(doc_uname, {}).get("display_name")
     if not display_name and 'username' in doctors_df.columns:
         row = doctors_df.loc[doctors_df['username'] == doc_uname]
@@ -554,106 +869,191 @@ elif st.session_state.logged_in and st.session_state.role == "Doctor":
             display_name = row.iloc[0].get('name')
     display_name = display_name or doc_uname
 
-    st.subheader(f"Welcome, Dr. {display_name}!")
-    st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-    st.markdown("### 🗓 Your Appointments")
+    # Header exactly as requested
+    st.markdown(f"**Welcome, {html.escape(str(display_name))}!**")
+
+    # -----------------------------
+    # helper: display patient history (define BEFORE it's called)
+    # -----------------------------
+    def _display_patient_history(patient_name):
+        st.markdown(f"#### History for: {html.escape(str(patient_name))}")
+        all_appts = load_appointments()
+
+        # past accepted/completed appointments for this patient
+        past = [a for a in all_appts if a.get("patient") == patient_name and a.get("status") in ("Accepted", "Completed")]
+
+        # rows from HISTORY_CSV
+        hist_rows = []
+        try:
+            if os.path.exists(HISTORY_CSV):
+                hist_df = pd.read_csv(HISTORY_CSV)
+                if not hist_df.empty and 'patient' in hist_df.columns:
+                    # ensure patient column is treated as string
+                    hist_rows = hist_df[hist_df['patient'].astype(str) == str(patient_name)].to_dict("records")
+        except Exception:
+            hist_rows = []
+
+        # Combine and sort by created_at/completed_at descending
+        combined = sorted(past + hist_rows, key=lambda x: x.get("created_at") or x.get("completed_at") or "", reverse=True)
+
+        if not combined:
+            st.write("No recorded visits found for this patient.")
+            return
+
+        for rec in combined:
+            date_str = rec.get("created_at") or rec.get("completed_at") or ""
+            try:
+                if date_str:
+                    dt = datetime.fromisoformat(date_str)
+                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                # leave original if parsing fails
+                pass
+            doctor_name = rec.get("doctor") or rec.get("doctor_username") or ""
+            symptom = rec.get("symptom") or ""
+            status = rec.get("status") or ("Completed" if rec.get("completed_at") else "")
+            st.markdown(f"- **Date:** {html.escape(str(date_str))}  \n  **Doctor:** {html.escape(str(doctor_name))}  \n  **Reason:** {html.escape(str(symptom))}  \n  **Status:** {html.escape(str(status))}")
+
+    # -----------------------------
+    # Appointments (shown immediately under header)
+    # -----------------------------
+    st.markdown("<div class='app-card' style='margin-top:8px'>", unsafe_allow_html=True)
+    st.markdown("### Your Appointments")
+
     appts = get_doctor_appointments(doc_uname) or []
-    if appts:
-        for i, a in enumerate(sorted(appts, key=lambda x: x.get("created_at") or "", reverse=True)):
+    if not appts:
+        st.markdown("<div class='small-muted'>You have no appointments yet.</div>", unsafe_allow_html=True)
+    else:
+        # sort most recent first
+        visible_appts = sorted(appts, key=lambda x: x.get("created_at") or "", reverse=True)
+        for i, a in enumerate(visible_appts):
             status = a.get("status", "Pending")
             pill_class = "status-pending"
             emoji = "⚪"
-            if status == "Accepted":
+            if isinstance(status, str) and status.lower() == "accepted":
                 pill_class = "status-accepted"; emoji = "✅"
-            elif status == "Rejected":
+            elif isinstance(status, str) and status.lower() == "rejected":
                 pill_class = "status-rejected"; emoji = "❌"
-            st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-            st.markdown(f"**Patient:** {a.get('patient')}  \n**Time:** {a.get('time')}  \n**Symptom:** {a.get('symptom')}")
-            st.markdown(f"<div class='small-muted'>Created: {a.get('created_at')}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='status-pill {pill_class}' style='margin-top:8px'>{emoji} {status}</div>", unsafe_allow_html=True)
+            elif isinstance(status, str) and status.lower() == "completed":
+                pill_class = "status-accepted"; emoji = "✔️"
 
-            col1, col2, col3 = st.columns([1,1,1])
-            with col1:
+            st.markdown("<div class='app-card' style='margin-bottom:10px'>", unsafe_allow_html=True)
+            st.markdown(f"**Patient:** {html.escape(str(a.get('patient') or ''))}  \n**Time:** {html.escape(str(a.get('time') or ''))}  \n**Reason:** {html.escape(str(a.get('symptom') or ''))}")
+            st.markdown(f"<div class='small-muted'>Created: {html.escape(str(a.get('created_at') or ''))}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='status-pill {pill_class}' style='margin-top:8px'>{emoji} {html.escape(str(status))}</div>", unsafe_allow_html=True)
+
+            # Action buttons: Accept / Reject / Mark Completed (no delete)
+            c1, c2, c3 = st.columns([1,1,1])
+            with c1:
                 if status == "Pending":
-                    if st.button("Accept", key=f"accept_{a.get('patient')}_{a.get('time')}"):
+                    if st.button("Accept", key=f"accept_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
                         ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Accepted")
                         if ok:
-                            st.success("Appointment accepted.")
                             st.rerun()
                         else:
                             st.error("Failed to update appointment.")
-            with col2:
+            with c2:
                 if status == "Pending":
-                    if st.button("Reject", key=f"reject_{a.get('patient')}_{a.get('time')}"):
+                    if st.button("Reject", key=f"reject_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
                         ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Rejected")
                         if ok:
-                            st.warning("Appointment rejected.")
                             st.rerun()
                         else:
                             st.error("Failed to update appointment.")
-            with col3:
-                # allow doctor to delete this appointment (e.g., after treatment)
-                if st.button("Delete appointment", key=f"doc_delete_{i}_{a.get('patient')}_{a.get('time')}"):
-                    try:
-                        appts_all = load_appointments()
-                        removed = False
-                        for j, ap in enumerate(appts_all):
-                            if ap.get("patient") == a.get("patient") and ap.get("doctor_username") == doc_uname and ap.get("time") == a.get("time") and ap.get("created_at") == a.get("created_at"):
-                                appts_all.pop(j)
-                                removed = True
-                                break
-                        if removed:
-                            save_appointments(appts_all)
-                            st.success("Appointment deleted.")
+            with c3:
+                if status in ("Accepted",):
+                    if st.button("Mark as Completed", key=f"complete_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
+                        ok = mark_appointment_completed(a.get('patient'), doc_uname, a.get('time'))
+                        if ok:
                             st.rerun()
                         else:
-                            st.error("Could not find appointment to delete.")
-                    except Exception as e:
-                        st.error(f"Failed to delete appointment: {e}")
+                            st.error("Failed to mark completed.")
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # bulk delete older than days control for doctor
-        st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
-        days = st.number_input("Delete my appointments older than (days)", min_value=1, value=30, step=1, key="doc_delete_old_days")
-        if st.button("Delete my older appointments", key="doc_delete_old"):
-            cutoff = datetime.utcnow() - timedelta(days=int(days))
-            appts_all = load_appointments()
-            kept = []
-            removed_count = 0
-            for a in appts_all:
-                if a.get("doctor_username") != doc_uname:
-                    kept.append(a)
-                    continue
-                created = a.get("created_at")
-                dt = None
-                if created:
-                    try:
-                        dt = datetime.fromisoformat(created)
-                    except Exception:
-                        dt = None
-                if dt and dt < cutoff:
-                    removed_count += 1
-                else:
-                    kept.append(a)
-            save_appointments(kept)
-            st.success(f"Deleted {removed_count} of your appointment(s) older than {days} days.")
-            st.rerun()
-    else:
-        st.write("No appointments found.")
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # -----------------------------
+    # Single search to view patient history (one search box under appointments)
+    # -----------------------------
+    st.markdown("<div class='app-card' style='margin-top:12px'>", unsafe_allow_html=True)
+    st.markdown("### 🔎 View Patient History")
+
+    search_query = st.text_input("Enter patient name or username (partial match)", key="doctor_history_search")
+    if st.button("Search", key="doctor_history_search_btn"):
+        q = (search_query or "").strip()
+        if not q:
+            st.info("Please enter a patient name or username to search.")
+        else:
+            # Build candidates with normalization map
+            all_appts = load_appointments()
+            candidates_raw = [a.get("patient") for a in all_appts if a.get("patient")]
+            candidates = set([str(p).strip() for p in candidates_raw if p is not None])
+
+            # include patients from HISTORY_CSV
+            try:
+                if os.path.exists(HISTORY_CSV):
+                    hist_df = pd.read_csv(HISTORY_CSV)
+                    if not hist_df.empty and 'patient' in hist_df.columns:
+                        candidates |= set(hist_df['patient'].dropna().astype(str).str.strip().tolist())
+            except Exception:
+                pass
+
+            # normalize -> map normalized -> set(originals)
+            norm_map = {}
+            for orig in candidates:
+                norm = orig.strip().lower()
+                norm_map.setdefault(norm, set()).add(orig)
+
+            # find matches: any normalized candidate where query is substring
+            q_norm = q.lower()
+            matched_originals = set()
+            for norm, originals in norm_map.items():
+                if q_norm in norm:
+                    matched_originals.update(originals)
+
+            matches = sorted(list(matched_originals), key=lambda s: str(s).lower())
+
+            if not matches:
+                st.info("No patients found matching that query.")
+            elif len(matches) > 1:
+                pick = st.selectbox("Multiple matches — pick a patient", matches, key="doctor_history_pick")
+                if st.button("Show History", key="doctor_history_pick_btn"):
+                    _display_patient_history(pick)
+            else:
+                target = matches[0]
+                _display_patient_history(target)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # -----------------------------
 # ADMIN DASHBOARD (edit/delete doctor + manage appts)
+# Admin-only CSS and use_container_width for tables
 # -----------------------------
 elif st.session_state.logged_in and st.session_state.role == "Admin":
+    # --- Admin-only CSS injection (minimal & targeted) ---
+    ADMIN_WIDE_CSS = """
+    <style>
+    /* expand the main container for admin to give more horizontal room */
+    .block-container {
+      max-width: 1200px !important;
+      padding-left: 20px !important;
+      padding-right: 20px !important;
+    }
+    /* make Streamlit tables expand to container width */
+    .stDataFrame div[data-testid="stTable"] table, .stTable table { width: 100% !important; table-layout: auto; }
+    </style>
+    """
+    st.markdown(ADMIN_WIDE_CSS, unsafe_allow_html=True)
+
     st.subheader("Admin Dashboard")
     st.markdown("<div class='app-card'>", unsafe_allow_html=True)
     st.markdown("### 📋 All Appointments")
     all_appts = load_appointments()
     if all_appts:
         df = pd.DataFrame(all_appts)
-        st.table(df)
+        # use dataframe with container width so it expands in the wider admin container
+        st.dataframe(df, use_container_width=True)
+
 
         st.markdown("### Manage appointment")
         options = [f"{i}: {r.get('patient')} | {r.get('doctor') or r.get('doctor_username')} | {r.get('time')} | {r.get('status')}" for i, r in enumerate(all_appts)]
@@ -663,8 +1063,19 @@ elif st.session_state.logged_in and st.session_state.role == "Admin":
             row = all_appts[idx]
             st.markdown(f"**Selected:** {row.get('patient')} — {row.get('doctor') or row.get('doctor_username')} — {row.get('time')} — {row.get('status')}")
             col_a, col_b, col_c = st.columns([1,1,1])
+
+            # allow for any existing statuses, but provide sensible ordered list
+            status_list = ["Pending", "Accepted", "Rejected", "Completed"]
+            current_status = row.get("status", "Pending")
+            try:
+                default_index = status_list.index(str(current_status))
+            except ValueError:
+                # fallback: add it to the end and use that index
+                status_list.append(str(current_status))
+                default_index = len(status_list) - 1
+
             with col_a:
-                new_status = st.selectbox("New status", ["Pending", "Accepted", "Rejected"], index=["Pending","Accepted","Rejected"].index(row.get("status","Pending")))
+                new_status = st.selectbox("New status", status_list, index=default_index)
                 if st.button("Update status", key=f"admin_update_{idx}"):
                     ok = update_appointment_status(row.get('patient'), row.get('doctor_username') or row.get('doctor'), row.get('time'), new_status)
                     if ok:
@@ -813,11 +1224,8 @@ elif st.session_state.logged_in and st.session_state.role == "Admin":
     st.markdown("<div class='app-card'>", unsafe_allow_html=True)
     st.markdown("### 👨‍⚕ All Doctors Overview")
     if not doctors_df.empty:
-        st.table(doctors_df)
+        # use dataframe to allow horizontal expansion under admin width
+        st.dataframe(doctors_df, use_container_width=True)
     else:
         st.write("No doctors data available.")
     st.markdown("</div>", unsafe_allow_html=True)
-
-# Fallback
-else:
-    st.info("Select a role and login to continue.")

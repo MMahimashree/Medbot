@@ -38,13 +38,14 @@
   {
     "name": "Dr. Ishaan Kapoor",
     "specialty": "Cardiologist",
-    "rating": 4.9,
+    "rating": 4.8,
     "slots": [
       "9:00 AM",
       "11:00 AM",
       "3:30 PM",
       "5:30 PM"
-    ]
+    ],
+    "username": "drishaankapoor"
   },
   {
     "name": "Dr. Priya Nair",
@@ -565,17 +566,5 @@
       "Pm5:00Pm"
     ],
     "username": "drselva"
-  },
-  {
-    "name": "Dr Kamakshi",
-    "specialty": "Ophthalmologist",
-    "rating": 4.9,
-    "slots": [
-      "9:00am",
-      "11:00Am",
-      "2:00PM",
-      "5:00PM"
-    ],
-    "username": "drkamakshi"
   }
 ]
