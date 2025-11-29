@@ -125,15 +125,16 @@
     ]
   },
   {
-    "name": "Dr. Lakshman ",
+    "name": "Dr. Lakshman",
     "specialty": "Ophthalmologist",
-    "rating": 4.9,
+    "rating": 4.8,
     "slots": [
       "9:30 AM",
       "11:30 AM",
       "2:00 PM",
       "5:00 PM"
-    ]
+    ],
+    "username": "drlakshman"
   },
   {
     "name": "Dr. Gokul",
@@ -566,5 +567,17 @@
       "Pm5:00Pm"
     ],
     "username": "drselva"
+  },
+  {
+    "name": "Dr Dhanushree",
+    "specialty": "General physician",
+    "rating": 4.9,
+    "slots": [
+      "9:00 Am",
+      "11:00Am",
+      "2:00 Pm",
+      "5:00Pm"
+    ],
+    "username": "dhanushree"
   }
 ]

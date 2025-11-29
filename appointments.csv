@@ -1,0 +1,3 @@
+patient,doctor,doctor_username,time,symptom,status,created_at
+Saam,Dr. Aarav Sharma,draaravsharma,11:30 AM,fever,Completed,2025-11-27T17:30:12.001872
+saritha,Dr. Tanvi Sharma,drtanvisharma,12:30 PM,wheezing,Accepted,2025-11-29T06:08:58.492578

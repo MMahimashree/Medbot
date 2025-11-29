@@ -1,4 +1,3 @@
-# medbot_app.py (updated: patient chat widened, simple login, WhatsApp-style chat colors)
 import os
 import json
 import random
@@ -52,7 +51,6 @@ CHAT_CSS = """
   font-size: 1rem;
 }
 
-
 /* Bot bubble (left) - light neutral */
 .bot-bubble {
   display: inline-block;
@@ -97,9 +95,10 @@ CHAT_CSS = """
 @media (max-width: 800px) {
   .bot-bubble, .user-bubble { max-width: 94%; }
 }
+
+}
 </style>
 """
-
 st.markdown(CHAT_CSS, unsafe_allow_html=True)
 
 # Limit main content width & style a centered login card
@@ -129,7 +128,7 @@ NARROW_CSS = """
 """
 st.markdown(NARROW_CSS, unsafe_allow_html=True)
 
-# Background hero (kept in CSS but we'll hide the flashy parts via SIMPLE_LOGIN_CSS)
+
 BG_CSS = """
 <style>
 .login-hero {
@@ -181,14 +180,11 @@ BG_CSS = """
 """
 st.markdown(BG_CSS, unsafe_allow_html=True)
 
-# --- SIMPLE LOGIN CSS: hide flashy decorations and make login card plain/clean ---
+# Hide flashy decorations for simple login
 SIMPLE_LOGIN_CSS = """
 <style>
-/* hide the large background hero and decorative blobs for a minimal login */
 .login-hero { display: none !important; }
 .bg-blob { display: none !important; }
-
-/* simpler login card visuals */
 .login-card {
   background: #ffffff !important;
   border-radius: 12px;
@@ -200,7 +196,55 @@ SIMPLE_LOGIN_CSS = """
 """
 st.markdown(SIMPLE_LOGIN_CSS, unsafe_allow_html=True)
 
-# NOTE: we intentionally DO NOT render the login hero or blob elements to remove flashy visuals.
+# -----------------------------
+# Custom button colors (place AFTER your other CSS blocks)
+# -----------------------------
+CUSTOM_BTN_CSS = """
+<style>
+/* LOGIN (blue) — robust selectors to match Streamlit variations */
+div[data-testid="baseButton-login_btn"] button,
+div[data-testid="baseButton-login_btn"] div[role="button"],
+.login-card .stButton > button,
+.login-card .stButton > div[role="button"] {
+    background-color: #0b74de !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    box-shadow: 0 6px 18px rgba(11,116,222,0.18) !important;
+    font-weight: 600 !important;
+}
+
+/* LOGOUT (red) — target the Streamlit button wrapper for your logout key */
+div[data-testid="baseButton-logout_hidden"] button,
+div[data-testid="baseButton-logout_hidden"] div[role="button"],
+[data-testid*="baseButton-logout_hidden"] div[role="button"] {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    box-shadow: 0 6px 18px rgba(220,53,69,0.14) !important;
+    font-weight: 600 !important;
+}
+
+/* Hover effects */
+div[data-testid="baseButton-login_btn"] button:hover,
+div[data-testid="baseButton-login_btn"] div[role="button"]:hover,
+div[data-testid="baseButton-logout_hidden"] button:hover,
+div[data-testid="baseButton-logout_hidden"] div[role="button"]:hover,
+.login-card .stButton > button:hover {
+    filter: brightness(0.92) !important;
+    transform: translateY(-1px);
+}
+
+/* safety: keep default sizing for other Streamlit buttons */
+.stButton > button { min-width: 90px; }
+
+</style>
+"""
+st.markdown(CUSTOM_BTN_CSS, unsafe_allow_html=True)
+
 
 # -----------------------------
 # Load model + jsons
@@ -251,6 +295,7 @@ users = {
     "admin_user": {"password": "admin_pass", "role": "Admin"},
     "patient_user": {"password": "patient_pass", "role": "Patient"},
 }
+
 # build users from doctors_df but ensure username is a string (avoid NaN/float keys)
 for _, row in doctors_df.iterrows():
     if isinstance(row, pd.Series):
@@ -539,20 +584,32 @@ def recommend_doctors(symptom, top_n=3):
 # -----------------------------
 # session init
 # -----------------------------
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'role' not in st.session_state: st.session_state.role = None
-if 'username' not in st.session_state: st.session_state.username = None
-if 'chat_history' not in st.session_state: st.session_state.chat_history = []  # list of {"user": str or None, "bot": str or None}
-if 'current_symptom' not in st.session_state: st.session_state.current_symptom = None
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'role' not in st.session_state:
+    st.session_state.role = None
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []  # list of {"user": str or None, "bot": str or None}
+if 'current_symptom' not in st.session_state:
+    st.session_state.current_symptom = None
 # follow-up state (queue + pending + answers)
-if 'follow_up_queue' not in st.session_state: st.session_state.follow_up_queue = []  # remaining questions
-if 'pending_follow_up' not in st.session_state: st.session_state.pending_follow_up = None  # current question displayed and waiting for answer
-if 'follow_up_answers' not in st.session_state: st.session_state.follow_up_answers = {}
-if 'asking_follow_up' not in st.session_state: st.session_state.asking_follow_up = False
-if 'symptoms_collected' not in st.session_state: st.session_state.symptoms_collected = []
-if 'appointments' not in st.session_state: st.session_state.appointments = load_appointments()
-# UI: patient history toggle
-if 'show_history' not in st.session_state: st.session_state.show_history = False
+if 'follow_up_queue' not in st.session_state:
+    st.session_state.follow_up_queue = []  # remaining questions
+if 'pending_follow_up' not in st.session_state:
+    st.session_state.pending_follow_up = None  # current question displayed and waiting for answer
+if 'follow_up_answers' not in st.session_state:
+    st.session_state.follow_up_answers = {}
+if 'asking_follow_up' not in st.session_state:
+    st.session_state.asking_follow_up = False
+if 'symptoms_collected' not in st.session_state:
+    st.session_state.symptoms_collected = []
+if 'appointments' not in st.session_state:
+    st.session_state.appointments = load_appointments()
+# UI: patient history toggle (kept for compatibility, though now we use tabs)
+if 'show_history' not in st.session_state:
+    st.session_state.show_history = False
 
 # -----------------------------
 # UI helpers: chat bubbles (escape input)
@@ -619,6 +676,45 @@ def _render_history_card(appt):
     st.markdown(html_card, unsafe_allow_html=True)
 
 # -----------------------------
+# TOP BAR (username left, logout right)
+# -----------------------------
+def render_topbar():
+    col_left, col_right = st.columns([6, 1])
+    with col_left:
+        st.markdown(
+            f"**Logged in as:** {html.escape(str(st.session_state.username))} "
+            f"({html.escape(str(st.session_state.role))})"
+        )
+    with col_right:
+        # Keep the Streamlit button; its key is logout_hidden (we style it via CSS above)
+        if st.button("Logout", key="logout_hidden"):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
+
+        # JS to forward clicks from visible button to the hidden Streamlit button.
+        st.markdown(
+            """
+            <script>
+            (function(){
+              const vis = document.getElementById("logout_visible");
+              if(!vis) return;
+              vis.addEventListener("click", function(){
+                // find candidate hidden logout button(s)
+                const candidates = Array.from(document.querySelectorAll('button'))
+                  .filter(b => b !== vis && b.innerText && b.innerText.trim() === 'Logout');
+                if(candidates.length){
+                  // click the first candidate (the hidden st.button)
+                  candidates[0].click();
+                }
+              });
+            })();
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# -----------------------------
 # UI: Header / Login
 # -----------------------------
 st.markdown("<div class='header-space'></div>", unsafe_allow_html=True)
@@ -646,8 +742,8 @@ if not st.session_state.logged_in:
             username_input = st.text_input("Username")
         password = st.text_input("Password", type="password")
 
-    # Login handler (DO NOT output </div> inside this if)
-    if st.button("Login"):
+    if st.button("Login", key="login_btn"):
+
         username = username_input.strip() if isinstance(username_input, str) else username_input
         if not username:
             st.error("Please enter a username.")
@@ -686,32 +782,31 @@ if not st.session_state.logged_in:
                     hint = " Use the dropdown to pick your name or type your username. Demo doctor password: 'doctor_pass'." if user_type == "Doctor" else ""
                     st.error("Invalid credentials or role mismatch." + hint)
 
-    # CLOSE login-card wrapper here (after handling login, outside the button block)
     st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    st.sidebar.success(f"Logged in as: {st.session_state.username} ({st.session_state.role})")
-    if st.sidebar.button("Logout"):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.rerun()
+    # Top bar for any logged-in user
+    render_topbar()
 
 # -----------------------------
-# PATIENT DASHBOARD (modified width: chat area larger)
+# PATIENT DASHBOARD with TOP NAV (tabs)
 # -----------------------------
 if st.session_state.logged_in and st.session_state.role == "Patient":
     st.subheader(f"Welcome, {st.session_state.username}!")
-    # Wider patient dashboard chat area (changed from [3,1] to [5,1])
-    col_chat, col_side = st.columns([10, 1])
 
-    with col_chat:
+    tab_chat, tab_appts, tab_history = st.tabs(
+        ["💬 Chat", "📅 View Appointments", "📜 History (Doctors & Symptoms)"]
+    )
+
+    # ============= CHAT TAB =============
+    with tab_chat:
         st.markdown("### 💬 Chat with MedBot")
         # render history (chat bubbles)
         for chat in st.session_state.chat_history:
             if chat.get("user"):
-                _render_user_bubble(chat['user'])
+                _render_user_bubble(chat["user"])
             if chat.get("bot"):
-                _render_bot_bubble(chat['bot'])
+                _render_bot_bubble(chat["bot"])
 
         # follow-up handling (single pending question + queue, no duplicates)
         if st.session_state.asking_follow_up and st.session_state.pending_follow_up:
@@ -731,11 +826,16 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
                     # finalize follow-ups
                     st.session_state.pending_follow_up = None
                     st.session_state.asking_follow_up = False
-                    symptom = st.session_state.current_symptom or " / ".join(st.session_state.follow_up_answers.values())
+                    symptom = (
+                        st.session_state.current_symptom
+                        or " / ".join(st.session_state.follow_up_answers.values())
+                    )
                     username_display = st.session_state.username or "User"
-                    bot_msg = (f"Thank you, {username_display}. Based on what you’ve shared, "
-                               f"it seems you’re experiencing symptoms related to {symptom}. "
-                               "Here are some doctors who can help you.")
+                    bot_msg = (
+                        f"Thank you, {username_display}. Based on what you’ve shared, "
+                        f"it seems you’re experiencing symptoms related to {symptom}. "
+                        "Here are some doctors who can help you."
+                    )
                     st.session_state.chat_history.append({"user": None, "bot": bot_msg})
                     st.session_state.symptoms_collected.append(symptom)
                     # clear follow-up buffers (keep history)
@@ -746,40 +846,62 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
 
         else:
             if not st.session_state.symptoms_collected:
-                user_input = st.text_input("Describe your symptom (e.g., 'I have a fever')", key="symptom_input")
+                user_input = st.text_input(
+                    "Describe your symptom (e.g., 'I have a fever')",
+                    key="symptom_input",
+                )
                 if st.button("Send", key="send_symptom") and user_input.strip():
                     with st.spinner("MedBot is thinking..."):
                         time.sleep(0.5)
                         bot_resp, predicted_tag, fups = get_bot_response(user_input)
 
-                    # === FIX: Avoid duplicating follow-up text as immediate bot reply ===
-                    # If follow-ups exist and the chosen bot_resp matches one of them,
-                    # replace bot_resp with a neutral acknowledgement so the follow-up queue
-                    # will present the questions (only once).
-                    if fups and any(str(bot_resp).strip() == str(q).strip() for q in fups):
-                        bot_resp = "Let me ask you a few questions so I can understand your issue clearly."
+                    # avoid follow-up text duplication
+                    if fups and any(
+                        str(bot_resp).strip() == str(q).strip() for q in fups
+                    ):
+                        bot_resp = (
+                            "Let me ask you a few questions so I can understand your issue clearly."
+                        )
 
-                    # append user message and the immediate bot response (from intent.responses)
-                    st.session_state.chat_history.append({"user": user_input.strip(), "bot": bot_resp})
+                    # append user message and the immediate bot response
+                    st.session_state.chat_history.append(
+                        {"user": user_input.strip(), "bot": bot_resp}
+                    )
                     st.session_state.current_symptom = predicted_tag or user_input.strip()
-                    # if follow-ups exist, initialize queue and show first question (do NOT use follow-ups as bot reply)
+
+                    # if follow-ups exist, initialize queue and show first question
                     if fups:
-                        st.session_state.follow_up_queue = [str(x).strip() for x in fups if str(x).strip()]
-                        st.session_state.pending_follow_up = st.session_state.follow_up_queue.pop(0) if st.session_state.follow_up_queue else None
+                        st.session_state.follow_up_queue = [
+                            str(x).strip() for x in fups if str(x).strip()
+                        ]
+                        st.session_state.pending_follow_up = (
+                            st.session_state.follow_up_queue.pop(0)
+                            if st.session_state.follow_up_queue
+                            else None
+                        )
                         st.session_state.asking_follow_up = True
                         st.session_state.follow_up_answers = {}
                         # append first follow-up once
                         first_q = st.session_state.pending_follow_up
-                        if first_q and not any(chat.get("bot") == first_q for chat in st.session_state.chat_history):
-                            st.session_state.chat_history.append({"user": None, "bot": first_q})
+                        if first_q and not any(
+                            chat.get("bot") == first_q
+                            for chat in st.session_state.chat_history
+                        ):
+                            st.session_state.chat_history.append(
+                                {"user": None, "bot": first_q}
+                            )
                     else:
                         # no follow-ups: finalize immediately and show doctors
                         symptom = st.session_state.current_symptom
                         username_display = st.session_state.username or "User"
-                        bot_msg = (f"Thank you, {username_display}. Based on what you’ve shared, "
-                                   f"it seems you’re experiencing symptoms related to {symptom}. "
-                                   "Here are some doctors who can help you.")
-                        st.session_state.chat_history.append({"user": None, "bot": bot_msg})
+                        bot_msg = (
+                            f"Thank you, {username_display}. Based on what you’ve shared, "
+                            f"it seems you’re experiencing symptoms related to {symptom}. "
+                            "Here are some doctors who can help you."
+                        )
+                        st.session_state.chat_history.append(
+                            {"user": None, "bot": bot_msg}
+                        )
                         st.session_state.symptoms_collected.append(symptom)
                     st.rerun()
             else:
@@ -788,15 +910,38 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
                 top_docs = recommend_doctors(symptom, top_n=3)
                 if top_docs:
                     for i, d in enumerate(top_docs, 1):
-                        st.markdown(f"**{i}. {d['name']}**  — {d['specialty']}  — ⭐ {d['rating']}")
-                    choice = st.selectbox("Select doctor to book", [f"{d['name']} ({d['specialty']})" for d in top_docs], key="doc_select")
-                    selected_doc = top_docs[[f"{d['name']} ({d['specialty']})" for d in top_docs].index(choice)]
-                    slot = st.selectbox("Choose available slot", selected_doc['slots'] if selected_doc['slots'] else ["Any time"], key="slot_select")
+                        st.markdown(
+                            f"**{i}. {d['name']}**  — {d['specialty']}  — ⭐ {d['rating']}"
+                        )
+                    labels = [f"{d['name']} ({d['specialty']})" for d in top_docs]
+                    choice = st.selectbox(
+                        "Select doctor to book",
+                        labels,
+                        key="doc_select",
+                    )
+                    selected_doc = top_docs[labels.index(choice)]
+                    slot = st.selectbox(
+                        "Choose available slot",
+                        selected_doc["slots"] if selected_doc["slots"] else ["Any time"],
+                        key="slot_select",
+                    )
                     if st.button("Book Appointment", key="book_btn"):
-                        doctor_display = selected_doc.get('name') or selected_doc.get('username')
-                        doctor_username = selected_doc.get('username') or _normalize_username(doctor_display)
-                        appt = book_appointment(st.session_state.username, doctor_display, doctor_username, slot, symptom)
-                        st.success(f"Appointment requested with **{doctor_display}** at **{slot}**. Status: {appt['status']}")
+                        doctor_display = selected_doc.get("name") or selected_doc.get(
+                            "username"
+                        )
+                        doctor_username = selected_doc.get("username") or _normalize_username(
+                            doctor_display
+                        )
+                        appt = book_appointment(
+                            st.session_state.username,
+                            doctor_display,
+                            doctor_username,
+                            slot,
+                            symptom,
+                        )
+                        st.success(
+                            f"Appointment requested with **{doctor_display}** at **{slot}**. Status: {appt['status']}"
+                        )
                         st.session_state.current_symptom = None
                         st.session_state.symptoms_collected = []
                         st.session_state.follow_up_queue = []
@@ -807,39 +952,7 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
                 else:
                     st.write("No doctors found for that symptom — try rephrasing.")
 
-        # --- NEW: After chat area, show Latest Appointment + History (moved from side) ---
-        st.markdown("<div class='app-card' style='margin-top:14px'>", unsafe_allow_html=True)
-        st.markdown("### 📅 Latest Appointment")
-        last = get_latest_patient_appointment(st.session_state.username)
-        if last:
-            status = last.get("status", "Pending")
-            pill_class = "status-pending"
-            emoji = "⚪"
-            if status == "Accepted":
-                pill_class = "status-accepted"; emoji = "✅"
-            elif status == "Rejected":
-                pill_class = "status-rejected"; emoji = "❌"
-            st.markdown(f"<div class='status-pill {pill_class}'>{emoji} {status}</div>", unsafe_allow_html=True)
-            st.markdown(f"**Doctor:** {last.get('doctor') or last.get('doctor_username')}  \n**Time:** {last.get('time')}  \n**Symptom:** {last.get('symptom')}")
-        else:
-            st.write("No bookings yet.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # ====== View Appointment History (moved under chat) ======
-        st.markdown("<div class='app-card' style='margin-top:10px'>", unsafe_allow_html=True)
-        if st.button("📜 View Appointment History", key="view_history_btn"):
-            st.session_state.show_history = not st.session_state.show_history
-        if st.session_state.show_history:
-            st.markdown("### 📜 Your Appointment History")
-            visits = get_patient_visit_history(st.session_state.username)
-            if visits:
-                for v in visits:
-                    _render_history_card(v)
-            else:
-                st.markdown("No past visits recorded.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # Keep the Clear Chat button here as well
+        # Clear chat button only in Chat tab
         if st.button("Clear Chat", key="clear_chat_main"):
             st.session_state.chat_history = []
             st.session_state.current_symptom = None
@@ -850,10 +963,68 @@ if st.session_state.logged_in and st.session_state.role == "Patient":
             st.session_state.symptoms_collected = []
             st.rerun()
 
-    # keep the original empty right column (or you can use it later)
-    with col_side:
-        # intentionally left blank so right column doesn't show duplicate content
-        st.write("")
+    # ============= VIEW APPOINTMENTS TAB =============
+    with tab_appts:
+        st.markdown("### 📅 Your Appointments")
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        st.markdown("#### Latest Appointment")
+        last = get_latest_patient_appointment(st.session_state.username)
+        if last:
+            status = last.get("status", "Pending")
+            pill_class = "status-pending"
+            emoji = "⚪"
+            if status == "Accepted":
+                pill_class = "status-accepted"; emoji = "✅"
+            elif status == "Rejected":
+                pill_class = "status-rejected"; emoji = "❌"
+            elif status == "Completed":
+                pill_class = "status-accepted"; emoji = "✔️"
+            st.markdown(
+                f"<div class='status-pill {pill_class}'>{emoji} {status}</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"**Doctor:** {last.get('doctor') or last.get('doctor_username')}  \n"
+                f"**Time:** {last.get('time')}  \n"
+                f"**Symptom:** {last.get('symptom')}"
+            )
+        else:
+            st.write("No bookings yet.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div class='app-card' style='margin-top:10px'>", unsafe_allow_html=True)
+        st.markdown("#### All Appointment Requests")
+        all_appts = get_patient_appointments(st.session_state.username)
+        if all_appts:
+            for a in sorted(all_appts, key=lambda x: x.get("created_at") or "", reverse=True):
+                _render_history_card(a)
+        else:
+            st.write("No appointments found.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ============= HISTORY TAB =============
+    with tab_history:
+        st.markdown("### 📜 History of Doctors & Symptoms Visited")
+        visits = get_patient_visit_history(st.session_state.username)
+        if not visits:
+            st.write("No completed or accepted visits yet.")
+        else:
+            for v in visits:
+                doctor = v.get("doctor") or v.get("doctor_username")
+                symptom = v.get("symptom")
+                created = v.get("created_at")
+                date_str = ""
+                try:
+                    if created:
+                        dt = datetime.fromisoformat(created)
+                        date_str = dt.strftime("%Y-%m-%d")
+                except Exception:
+                    date_str = created or ""
+                st.markdown(
+                    f"- **Date:** {date_str}  \n"
+                    f"  **Doctor:** {doctor}  \n"
+                    f"  **Symptom:** {symptom}"
+                )
 
 # -----------------------------
 # DOCTOR DASHBOARD (view appts + mark completed; search -> single patient history)
@@ -869,363 +1040,365 @@ elif st.session_state.logged_in and st.session_state.role == "Doctor":
             display_name = row.iloc[0].get('name')
     display_name = display_name or doc_uname
 
-    # Header exactly as requested
     st.markdown(f"**Welcome, {html.escape(str(display_name))}!**")
 
-    # -----------------------------
-    # helper: display patient history (define BEFORE it's called)
-    # -----------------------------
-    def _display_patient_history(patient_name):
-        st.markdown(f"#### History for: {html.escape(str(patient_name))}")
-        all_appts = load_appointments()
+    # Tabs for doctor navigation
+    tab_doc_appts, tab_doc_history = st.tabs(["📅 Appointments", "📜 Patient History"])
 
-        # past accepted/completed appointments for this patient
-        past = [a for a in all_appts if a.get("patient") == patient_name and a.get("status") in ("Accepted", "Completed")]
+    # --------- TAB 1: Appointments ----------
+    with tab_doc_appts:
+        st.markdown("<div class='app-card' style='margin-top:8px'>", unsafe_allow_html=True)
+        st.markdown("### Your Appointments")
 
-        # rows from HISTORY_CSV
-        hist_rows = []
-        try:
-            if os.path.exists(HISTORY_CSV):
-                hist_df = pd.read_csv(HISTORY_CSV)
-                if not hist_df.empty and 'patient' in hist_df.columns:
-                    # ensure patient column is treated as string
-                    hist_rows = hist_df[hist_df['patient'].astype(str) == str(patient_name)].to_dict("records")
-        except Exception:
-            hist_rows = []
-
-        # Combine and sort by created_at/completed_at descending
-        combined = sorted(past + hist_rows, key=lambda x: x.get("created_at") or x.get("completed_at") or "", reverse=True)
-
-        if not combined:
-            st.write("No recorded visits found for this patient.")
-            return
-
-        for rec in combined:
-            date_str = rec.get("created_at") or rec.get("completed_at") or ""
-            try:
-                if date_str:
-                    dt = datetime.fromisoformat(date_str)
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                # leave original if parsing fails
-                pass
-            doctor_name = rec.get("doctor") or rec.get("doctor_username") or ""
-            symptom = rec.get("symptom") or ""
-            status = rec.get("status") or ("Completed" if rec.get("completed_at") else "")
-            st.markdown(f"- **Date:** {html.escape(str(date_str))}  \n  **Doctor:** {html.escape(str(doctor_name))}  \n  **Reason:** {html.escape(str(symptom))}  \n  **Status:** {html.escape(str(status))}")
-
-    # -----------------------------
-    # Appointments (shown immediately under header)
-    # -----------------------------
-    st.markdown("<div class='app-card' style='margin-top:8px'>", unsafe_allow_html=True)
-    st.markdown("### Your Appointments")
-
-    appts = get_doctor_appointments(doc_uname) or []
-    if not appts:
-        st.markdown("<div class='small-muted'>You have no appointments yet.</div>", unsafe_allow_html=True)
-    else:
-        # sort most recent first
-        visible_appts = sorted(appts, key=lambda x: x.get("created_at") or "", reverse=True)
-        for i, a in enumerate(visible_appts):
-            status = a.get("status", "Pending")
-            pill_class = "status-pending"
-            emoji = "⚪"
-            if isinstance(status, str) and status.lower() == "accepted":
-                pill_class = "status-accepted"; emoji = "✅"
-            elif isinstance(status, str) and status.lower() == "rejected":
-                pill_class = "status-rejected"; emoji = "❌"
-            elif isinstance(status, str) and status.lower() == "completed":
-                pill_class = "status-accepted"; emoji = "✔️"
-
-            st.markdown("<div class='app-card' style='margin-bottom:10px'>", unsafe_allow_html=True)
-            st.markdown(f"**Patient:** {html.escape(str(a.get('patient') or ''))}  \n**Time:** {html.escape(str(a.get('time') or ''))}  \n**Reason:** {html.escape(str(a.get('symptom') or ''))}")
-            st.markdown(f"<div class='small-muted'>Created: {html.escape(str(a.get('created_at') or ''))}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='status-pill {pill_class}' style='margin-top:8px'>{emoji} {html.escape(str(status))}</div>", unsafe_allow_html=True)
-
-            # Action buttons: Accept / Reject / Mark Completed (no delete)
-            c1, c2, c3 = st.columns([1,1,1])
-            with c1:
-                if status == "Pending":
-                    if st.button("Accept", key=f"accept_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
-                        ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Accepted")
-                        if ok:
-                            st.rerun()
-                        else:
-                            st.error("Failed to update appointment.")
-            with c2:
-                if status == "Pending":
-                    if st.button("Reject", key=f"reject_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
-                        ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Rejected")
-                        if ok:
-                            st.rerun()
-                        else:
-                            st.error("Failed to update appointment.")
-            with c3:
-                if status in ("Accepted",):
-                    if st.button("Mark as Completed", key=f"complete_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
-                        ok = mark_appointment_completed(a.get('patient'), doc_uname, a.get('time'))
-                        if ok:
-                            st.rerun()
-                        else:
-                            st.error("Failed to mark completed.")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # -----------------------------
-    # Single search to view patient history (one search box under appointments)
-    # -----------------------------
-    st.markdown("<div class='app-card' style='margin-top:12px'>", unsafe_allow_html=True)
-    st.markdown("### 🔎 View Patient History")
-
-    search_query = st.text_input("Enter patient name or username (partial match)", key="doctor_history_search")
-    if st.button("Search", key="doctor_history_search_btn"):
-        q = (search_query or "").strip()
-        if not q:
-            st.info("Please enter a patient name or username to search.")
+        appts = get_doctor_appointments(doc_uname) or []
+        if not appts:
+            st.markdown("<div class='small-muted'>You have no appointments yet.</div>", unsafe_allow_html=True)
         else:
-            # Build candidates with normalization map
-            all_appts = load_appointments()
-            candidates_raw = [a.get("patient") for a in all_appts if a.get("patient")]
-            candidates = set([str(p).strip() for p in candidates_raw if p is not None])
+            visible_appts = sorted(appts, key=lambda x: x.get("created_at") or "", reverse=True)
+            for i, a in enumerate(visible_appts):
+                status = a.get("status", "Pending")
+                pill_class = "status-pending"
+                emoji = "⚪"
+                if isinstance(status, str) and status.lower() == "accepted":
+                    pill_class = "status-accepted"; emoji = "✅"
+                elif isinstance(status, str) and status.lower() == "rejected":
+                    pill_class = "status-rejected"; emoji = "❌"
+                elif isinstance(status, str) and status.lower() == "completed":
+                    pill_class = "status-accepted"; emoji = "✔️"
 
-            # include patients from HISTORY_CSV
+                st.markdown("<div class='app-card' style='margin-bottom:10px'>", unsafe_allow_html=True)
+                st.markdown(f"**Patient:** {html.escape(str(a.get('patient') or ''))}  \n**Time:** {html.escape(str(a.get('time') or ''))}  \n**Reason:** {html.escape(str(a.get('symptom') or ''))}")
+                st.markdown(f"<div class='small-muted'>Created: {html.escape(str(a.get('created_at') or ''))}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='status-pill {pill_class}' style='margin-top:8px'>{emoji} {html.escape(str(status))}</div>", unsafe_allow_html=True)
+
+                c1, c2, c3 = st.columns([1,1,1])
+                with c1:
+                    if status == "Pending":
+                        if st.button("Accept", key=f"accept_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
+                            ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Accepted")
+                            if ok:
+                                st.rerun()
+                            else:
+                                st.error("Failed to update appointment.")
+                with c2:
+                    if status == "Pending":
+                        if st.button("Reject", key=f"reject_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
+                            ok = update_appointment_status(a.get('patient'), doc_uname, a.get('time'), "Rejected")
+                            if ok:
+                                st.rerun()
+                            else:
+                                st.error("Failed to update appointment.")
+                with c3:
+                    if status in ("Accepted",):
+                        if st.button("Mark as Completed", key=f"complete_{doc_uname}_{i}_{a.get('patient')}_{a.get('time')}"):
+                            ok = mark_appointment_completed(a.get('patient'), doc_uname, a.get('time'))
+                            if ok:
+                                st.rerun()
+                            else:
+                                st.error("Failed to mark completed.")
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --------- TAB 2: Patient History ----------
+    with tab_doc_history:
+        st.markdown("<div class='app-card' style='margin-top:12px'>", unsafe_allow_html=True)
+        st.markdown("### 🔎 View Patient History")
+
+        def _display_patient_history(patient_name):
+            st.markdown(f"#### History for: {html.escape(str(patient_name))}")
+            all_appts = load_appointments()
+
+            # past accepted/completed appointments for this patient
+            past = [a for a in all_appts 
+        if a.get("patient") == patient_name 
+        and a.get("doctor_username") == doc_uname
+        and a.get("status") in ("Accepted", "Completed")]
+
+
+            # rows from HISTORY_CSV
+            hist_rows = []
             try:
                 if os.path.exists(HISTORY_CSV):
                     hist_df = pd.read_csv(HISTORY_CSV)
                     if not hist_df.empty and 'patient' in hist_df.columns:
-                        candidates |= set(hist_df['patient'].dropna().astype(str).str.strip().tolist())
+                        # ensure patient column is treated as string
+                        hist_rows = hist_df[
+    (hist_df['patient'].astype(str) == str(patient_name)) &
+    (hist_df['doctor_username'].astype(str) == str(doc_uname))
+].to_dict("records")
+
             except Exception:
-                pass
+                hist_rows = []
 
-            # normalize -> map normalized -> set(originals)
-            norm_map = {}
-            for orig in candidates:
-                norm = orig.strip().lower()
-                norm_map.setdefault(norm, set()).add(orig)
+            # Combine and sort by created_at/completed_at descending
+            combined = sorted(past + hist_rows, key=lambda x: x.get("created_at") or x.get("completed_at") or "", reverse=True)
 
-            # find matches: any normalized candidate where query is substring
-            q_norm = q.lower()
-            matched_originals = set()
-            for norm, originals in norm_map.items():
-                if q_norm in norm:
-                    matched_originals.update(originals)
+            if not combined:
+                st.write("No recorded visits found for this patient.")
+                return
 
-            matches = sorted(list(matched_originals), key=lambda s: str(s).lower())
+            for rec in combined:
+                date_str = rec.get("created_at") or rec.get("completed_at") or ""
+                try:
+                    if date_str:
+                        dt = datetime.fromisoformat(date_str)
+                        date_str = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
+                doctor_name = rec.get("doctor") or rec.get("doctor_username") or ""
+                symptom = rec.get("symptom") or ""
+                status = rec.get("status") or ("Completed" if rec.get("completed_at") else "")
+                st.markdown(f"- **Date:** {html.escape(str(date_str))}  \n  **Doctor:** {html.escape(str(doctor_name))}  \n  **Reason:** {html.escape(str(symptom))}  \n  **Status:** {html.escape(str(status))}")
 
-            if not matches:
-                st.info("No patients found matching that query.")
-            elif len(matches) > 1:
-                pick = st.selectbox("Multiple matches — pick a patient", matches, key="doctor_history_pick")
-                if st.button("Show History", key="doctor_history_pick_btn"):
-                    _display_patient_history(pick)
+        search_query = st.text_input("Enter patient name or username (partial match)", key="doctor_history_search")
+        if st.button("Search", key="doctor_history_search_btn"):
+            q = (search_query or "").strip()
+            if not q:
+                st.info("Please enter a patient name or username to search.")
             else:
-                target = matches[0]
-                _display_patient_history(target)
+                # Build candidates with normalization map
+                all_appts = load_appointments()
+                candidates_raw = [a.get("patient") for a in all_appts if a.get("patient")]
+                candidates = set([str(p).strip() for p in candidates_raw if p is not None])
 
-    st.markdown("</div>", unsafe_allow_html=True)
+                # include patients from HISTORY_CSV
+                try:
+                    if os.path.exists(HISTORY_CSV):
+                        hist_df = pd.read_csv(HISTORY_CSV)
+                        if not hist_df.empty and 'patient' in hist_df.columns:
+                            candidates |= set(hist_df['patient'].dropna().astype(str).str.strip().tolist())
+                except Exception:
+                    pass
+
+                # normalize -> map normalized -> set(originals)
+                norm_map = {}
+                for orig in candidates:
+                    norm = orig.strip().lower()
+                    norm_map.setdefault(norm, set()).add(orig)
+
+                # find matches: any normalized candidate where query is substring
+                q_norm = q.lower()
+                matched_originals = set()
+                for norm, originals in norm_map.items():
+                    if q_norm in norm:
+                        matched_originals.update(originals)
+
+                matches = sorted(list(matched_originals), key=lambda s: str(s).lower())
+
+                if not matches:
+                    st.info("No patients found matching that query.")
+                elif len(matches) > 1:
+                    pick = st.selectbox("Multiple matches — pick a patient", matches, key="doctor_history_pick")
+                    if st.button("Show History", key="doctor_history_pick_btn"):
+                        _display_patient_history(pick)
+                else:
+                    target = matches[0]
+                    _display_patient_history(target)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # -----------------------------
-# ADMIN DASHBOARD (edit/delete doctor + manage appts)
-# Admin-only CSS and use_container_width for tables
+# ADMIN DASHBOARD (tabs: Appointments / Doctors)
 # -----------------------------
 elif st.session_state.logged_in and st.session_state.role == "Admin":
-    # --- Admin-only CSS injection (minimal & targeted) ---
     ADMIN_WIDE_CSS = """
     <style>
-    /* expand the main container for admin to give more horizontal room */
     .block-container {
       max-width: 1200px !important;
       padding-left: 20px !important;
       padding-right: 20px !important;
     }
-    /* make Streamlit tables expand to container width */
     .stDataFrame div[data-testid="stTable"] table, .stTable table { width: 100% !important; table-layout: auto; }
     </style>
     """
     st.markdown(ADMIN_WIDE_CSS, unsafe_allow_html=True)
 
     st.subheader("Admin Dashboard")
-    st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-    st.markdown("### 📋 All Appointments")
-    all_appts = load_appointments()
-    if all_appts:
-        df = pd.DataFrame(all_appts)
-        # use dataframe with container width so it expands in the wider admin container
-        st.dataframe(df, use_container_width=True)
 
+    tab_admin_appts, tab_admin_docs = st.tabs(["📋 Appointments", "👨‍⚕ Doctors"])
 
-        st.markdown("### Manage appointment")
-        options = [f"{i}: {r.get('patient')} | {r.get('doctor') or r.get('doctor_username')} | {r.get('time')} | {r.get('status')}" for i, r in enumerate(all_appts)]
-        sel = st.selectbox("Select appointment", ["Select"] + options, index=0)
-        if sel and sel != "Select":
-            idx = int(sel.split(":", 1)[0])
-            row = all_appts[idx]
-            st.markdown(f"**Selected:** {row.get('patient')} — {row.get('doctor') or row.get('doctor_username')} — {row.get('time')} — {row.get('status')}")
-            col_a, col_b, col_c = st.columns([1,1,1])
+    # -------- TAB 1: Appointments --------
+    with tab_admin_appts:
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        st.markdown("### 📋 All Appointments")
+        all_appts = load_appointments()
+        if all_appts:
+            df = pd.DataFrame(all_appts)
+            st.dataframe(df, use_container_width=True)
 
-            # allow for any existing statuses, but provide sensible ordered list
-            status_list = ["Pending", "Accepted", "Rejected", "Completed"]
-            current_status = row.get("status", "Pending")
-            try:
-                default_index = status_list.index(str(current_status))
-            except ValueError:
-                # fallback: add it to the end and use that index
-                status_list.append(str(current_status))
-                default_index = len(status_list) - 1
+            st.markdown("### Manage appointment")
+            options = [f"{i}: {r.get('patient')} | {r.get('doctor') or r.get('doctor_username')} | {r.get('time')} | {r.get('status')}" for i, r in enumerate(all_appts)]
+            sel = st.selectbox("Select appointment", ["Select"] + options, index=0)
+            if sel and sel != "Select":
+                idx = int(sel.split(":", 1)[0])
+                row = all_appts[idx]
+                st.markdown(f"**Selected:** {row.get('patient')} — {row.get('doctor') or row.get('doctor_username')} — {row.get('time')} — {row.get('status')}")
+                col_a, col_b, col_c = st.columns([1,1,1])
 
-            with col_a:
-                new_status = st.selectbox("New status", status_list, index=default_index)
-                if st.button("Update status", key=f"admin_update_{idx}"):
-                    ok = update_appointment_status(row.get('patient'), row.get('doctor_username') or row.get('doctor'), row.get('time'), new_status)
-                    if ok:
-                        st.success("Updated.")
-                        st.rerun()
-                    else:
-                        st.error("Failed to update.")
-            with col_b:
-                if st.button("Delete selected appointment", key=f"admin_delete_{idx}"):
-                    appts = load_appointments()
+                # allow for any existing statuses, but provide sensible ordered list
+                status_list = ["Pending", "Accepted", "Rejected", "Completed"]
+                current_status = row.get("status", "Pending")
+                try:
+                    default_index = status_list.index(str(current_status))
+                except ValueError:
+                    status_list.append(str(current_status))
+                    default_index = len(status_list) - 1
+
+                with col_a:
+                    new_status = st.selectbox("New status", status_list, index=default_index)
+                    if st.button("Update status", key=f"admin_update_{idx}"):
+                        ok = update_appointment_status(row.get('patient'), row.get('doctor_username') or row.get('doctor'), row.get('time'), new_status)
+                        if ok:
+                            st.success("Updated.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to update.")
+                with col_b:
+                    if st.button("Delete selected appointment", key=f"admin_delete_{idx}"):
+                        appts = load_appointments()
+                        try:
+                            appts.pop(idx)
+                            save_appointments(appts)
+                            st.success("Deleted appointment.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to delete: {e}")
+                with col_c:
+                    days_cut = st.number_input("Delete if older than (days)", min_value=0, value=0, step=1, key="admin_delete_if_days")
+                    if st.button("Delete if older", key=f"admin_delete_if_{idx}"):
+                        created = row.get("created_at")
+                        removed = False
+                        if created:
+                            try:
+                                dt = datetime.fromisoformat(created)
+                                cutoff = datetime.utcnow() - timedelta(days=int(days_cut))
+                                if dt < cutoff:
+                                    appts = load_appointments()
+                                    appts.pop(idx)
+                                    save_appointments(appts)
+                                    st.success("Deleted appointment (older than cutoff).")
+                                    removed = True
+                            except Exception:
+                                st.error("Cannot parse appointment date; aborted.")
+                        if not removed and days_cut == 0:
+                            st.info("No deletion: appointment not older than cutoff.")
+                        if removed:
+                            st.rerun()
+        else:
+            st.write("No appointments recorded.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # -------- TAB 2: Doctors --------
+    with tab_admin_docs:
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        st.markdown("### ➕ Add / ✏️ Edit / 🗑 Delete doctor")
+
+        doc_opts = ["Add new doctor"] + [f"{i}: {d.get('name')} ({d.get('username') or _normalize_username(d.get('name',''))})" for i, d in enumerate(doctors)]
+        sel_doc = st.selectbox("Choose action / doctor", doc_opts, index=0, key="admin_doc_action")
+
+        if sel_doc == "Add new doctor":
+            with st.form("admin_add_doc", clear_on_submit=True):
+                d_name = st.text_input("Name")
+                d_specialty = st.text_input("Specialty")
+                d_rating = st.number_input("Rating", min_value=0.0, max_value=5.0, value=4.5, step=0.1)
+                d_slots = st.text_input("Slots (comma-separated) — e.g. 9:00 AM, 11:00 AM")
+                d_username = st.text_input("Username (optional — autogenerated from name if blank)")
+                add_sub = st.form_submit_button("Add Doctor")
+            if add_sub:
+                if not d_name.strip() or not d_specialty.strip():
+                    st.error("Name and Specialty required.")
+                else:
+                    uname = d_username.strip() or _normalize_username(d_name)
+                    new_doc = {"name": d_name.strip(), "specialty": d_specialty.strip(), "rating": float(d_rating), "slots": [s.strip() for s in d_slots.split(",") if s.strip()], "username": uname}
                     try:
-                        appts.pop(idx)
-                        save_appointments(appts)
-                        st.success("Deleted appointment.")
+                        doctors.append(new_doc)
+                        with open("doctors.json", "w", encoding="utf-8") as f:
+                            json.dump(doctors, f, ensure_ascii=False, indent=2)
+                        doctors_df = pd.DataFrame(doctors)
+                        users[uname] = {"password": "doctor_pass", "role": "Doctor", "display_name": d_name.strip()}
+                        # refresh helpers
+                        doctor_usernames = sorted([u for u, meta in users.items() if meta.get("role") == "Doctor"], key=lambda s: str(s).lower())
+                        doctor_rows = [{"username": u, "name": users[u].get("display_name", u)} for u in doctor_usernames]
+                        _display_to_uname.clear()
+                        for u in doctor_usernames:
+                            disp = users[u].get("display_name", u)
+                            _display_to_uname["".join(ch for ch in str(disp).lower() if ch.isalnum())] = u
+                        st.success(f"Doctor {d_name} added (username: {uname}).")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Failed to delete: {e}")
-            with col_c:
-                days_cut = st.number_input("Delete if older than (days)", min_value=0, value=0, step=1, key="admin_delete_if_days")
-                if st.button("Delete if older", key=f"admin_delete_if_{idx}"):
-                    created = row.get("created_at")
-                    removed = False
-                    if created:
-                        try:
-                            dt = datetime.fromisoformat(created)
-                            cutoff = datetime.utcnow() - timedelta(days=int(days_cut))
-                            if dt < cutoff:
-                                appts = load_appointments()
-                                appts.pop(idx)
-                                save_appointments(appts)
-                                st.success("Deleted appointment (older than cutoff).")
-                                removed = True
-                        except Exception:
-                            st.error("Cannot parse appointment date; aborted.")
-                    if not removed and days_cut == 0:
-                        st.info("No deletion: appointment not older than cutoff.")
-                    if removed:
-                        st.rerun()
-    else:
-        st.write("No appointments recorded.")
-    st.markdown("</div>", unsafe_allow_html=True)
+                        st.error(f"Failed to add doctor: {e}")
+        else:
+            idx = int(sel_doc.split(":", 1)[0])
+            doc = doctors[idx]
+            cur_name = doc.get("name", "")
+            cur_spec = doc.get("specialty", "")
+            cur_rating = float(doc.get("rating", 4.5)) if doc.get("rating") is not None else 4.5
+            cur_slots = ", ".join(doc.get("slots", [])) if isinstance(doc.get("slots", []), list) else str(doc.get("slots", ""))
+            cur_uname = doc.get("username") or _normalize_username(cur_name)
 
-    # -----------------------------
-    # Admin: Add / Edit / Delete doctor
-    # -----------------------------
-    st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-    st.markdown("### ➕ Add / ✏️ Edit / 🗑 Delete doctor")
-
-    # select doctor to edit/delete (or choose Add new)
-    doc_opts = ["Add new doctor"] + [f"{i}: {d.get('name')} ({d.get('username') or _normalize_username(d.get('name',''))})" for i, d in enumerate(doctors)]
-    sel_doc = st.selectbox("Choose action / doctor", doc_opts, index=0, key="admin_doc_action")
-    if sel_doc == "Add new doctor":
-        with st.form("admin_add_doc", clear_on_submit=True):
-            d_name = st.text_input("Name")
-            d_specialty = st.text_input("Specialty")
-            d_rating = st.number_input("Rating", min_value=0.0, max_value=5.0, value=4.5, step=0.1)
-            d_slots = st.text_input("Slots (comma-separated) — e.g. 9:00 AM, 11:00 AM")
-            d_username = st.text_input("Username (optional — autogenerated from name if blank)")
-            add_sub = st.form_submit_button("Add Doctor")
-        if add_sub:
-            if not d_name.strip() or not d_specialty.strip():
-                st.error("Name and Specialty required.")
-            else:
-                uname = d_username.strip() or _normalize_username(d_name)
-                new_doc = {"name": d_name.strip(), "specialty": d_specialty.strip(), "rating": float(d_rating), "slots": [s.strip() for s in d_slots.split(",") if s.strip()], "username": uname}
+            with st.form(f"admin_edit_doc_{idx}", clear_on_submit=False):
+                e_name = st.text_input("Name", value=cur_name)
+                e_specialty = st.text_input("Specialty", value=cur_spec)
+                e_rating = st.number_input("Rating", min_value=0.0, max_value=5.0, value=cur_rating, step=0.1)
+                e_slots = st.text_input("Slots (comma-separated)", value=cur_slots)
+                e_username = st.text_input("Username", value=cur_uname)
+                save_edit = st.form_submit_button("Save changes")
+                delete_doc = st.form_submit_button("Delete this doctor")
+            if save_edit:
                 try:
-                    doctors.append(new_doc)
+                    doctors[idx]["name"] = e_name.strip()
+                    doctors[idx]["specialty"] = e_specialty.strip()
+                    doctors[idx]["rating"] = float(e_rating)
+                    doctors[idx]["slots"] = [s.strip() for s in e_slots.split(",") if s.strip()]
+                    doctors[idx]["username"] = e_username.strip() or _normalize_username(e_name)
                     with open("doctors.json", "w", encoding="utf-8") as f:
                         json.dump(doctors, f, ensure_ascii=False, indent=2)
+                    users[e_username.strip()] = {"password": users.get(cur_uname, {}).get("password", "doctor_pass"), "role": "Doctor", "display_name": e_name.strip()}
+                    if cur_uname != e_username.strip():
+                        users.pop(cur_uname, None)
                     doctors_df = pd.DataFrame(doctors)
-                    users[uname] = {"password": "doctor_pass", "role": "Doctor", "display_name": d_name.strip()}
-                    # refresh helpers
                     doctor_usernames = sorted([u for u, meta in users.items() if meta.get("role") == "Doctor"], key=lambda s: str(s).lower())
                     doctor_rows = [{"username": u, "name": users[u].get("display_name", u)} for u in doctor_usernames]
                     _display_to_uname.clear()
                     for u in doctor_usernames:
                         disp = users[u].get("display_name", u)
                         _display_to_uname["".join(ch for ch in str(disp).lower() if ch.isalnum())] = u
-                    st.success(f"Doctor {d_name} added (username: {uname}).")
+                    st.success("Doctor updated.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Failed to add doctor: {e}")
-    else:
-        idx = int(sel_doc.split(":", 1)[0])
-        doc = doctors[idx]
-        cur_name = doc.get("name", "")
-        cur_spec = doc.get("specialty", "")
-        cur_rating = float(doc.get("rating", 4.5)) if doc.get("rating") is not None else 4.5
-        cur_slots = ", ".join(doc.get("slots", [])) if isinstance(doc.get("slots", []), list) else str(doc.get("slots", ""))
-        cur_uname = doc.get("username") or _normalize_username(cur_name)
-
-        with st.form(f"admin_edit_doc_{idx}", clear_on_submit=False):
-            e_name = st.text_input("Name", value=cur_name)
-            e_specialty = st.text_input("Specialty", value=cur_spec)
-            e_rating = st.number_input("Rating", min_value=0.0, max_value=5.0, value=cur_rating, step=0.1)
-            e_slots = st.text_input("Slots (comma-separated)", value=cur_slots)
-            e_username = st.text_input("Username", value=cur_uname)
-            save_edit = st.form_submit_button("Save changes")
-            delete_doc = st.form_submit_button("Delete this doctor")
-        if save_edit:
-            try:
-                doctors[idx]["name"] = e_name.strip()
-                doctors[idx]["specialty"] = e_specialty.strip()
-                doctors[idx]["rating"] = float(e_rating)
-                doctors[idx]["slots"] = [s.strip() for s in e_slots.split(",") if s.strip()]
-                doctors[idx]["username"] = e_username.strip() or _normalize_username(e_name)
-                with open("doctors.json", "w", encoding="utf-8") as f:
-                    json.dump(doctors, f, ensure_ascii=False, indent=2)
-                users[e_username.strip()] = {"password": users.get(cur_uname, {}).get("password", "doctor_pass"), "role": "Doctor", "display_name": e_name.strip()}
-                if cur_uname != e_username.strip():
+                    st.error(f"Failed to save changes: {e}")
+            if delete_doc:
+                try:
+                    removed = doctors.pop(idx)
+                    with open("doctors.json", "w", encoding="utf-8") as f:
+                        json.dump(doctors, f, ensure_ascii=False, indent=2)
                     users.pop(cur_uname, None)
-                doctors_df = pd.DataFrame(doctors)
-                doctor_usernames = sorted([u for u, meta in users.items() if meta.get("role") == "Doctor"], key=lambda s: str(s).lower())
-                doctor_rows = [{"username": u, "name": users[u].get("display_name", u)} for u in doctor_usernames]
-                _display_to_uname.clear()
-                for u in doctor_usernames:
-                    disp = users[u].get("display_name", u)
-                    _display_to_uname["".join(ch for ch in str(disp).lower() if ch.isalnum())] = u
-                st.success("Doctor updated.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to save changes: {e}")
-        if delete_doc:
-            try:
-                removed = doctors.pop(idx)
-                with open("doctors.json", "w", encoding="utf-8") as f:
-                    json.dump(doctors, f, ensure_ascii=False, indent=2)
-                users.pop(cur_uname, None)
-                appts = load_appointments()
-                kept = [a for a in appts if a.get("doctor_username") != cur_uname]
-                save_appointments(kept)
-                doctors_df = pd.DataFrame(doctors)
-                doctor_usernames = sorted([u for u, meta in users.items() if meta.get("role") == "Doctor"], key=lambda s: str(s).lower())
-                doctor_rows = [{"username": u, "name": users[u].get("display_name", u)} for u in doctor_usernames]
-                _display_to_uname.clear()
-                for u in doctor_usernames:
-                    disp = users[u].get("display_name", u)
-                    _display_to_uname["".join(ch for ch in str(disp).lower() if ch.isalnum())] = u
-                st.success(f"Deleted doctor {removed.get('name')} and related appointments.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to delete doctor: {e}")
-    st.markdown("</div>", unsafe_allow_html=True)
+                    appts = load_appointments()
+                    kept = [a for a in appts if a.get("doctor_username") != cur_uname]
+                    save_appointments(kept)
+                    doctors_df = pd.DataFrame(doctors)
+                    doctor_usernames = sorted([u for u, meta in users.items() if meta.get("role") == "Doctor"], key=lambda s: str(s).lower())
+                    doctor_rows = [{"username": u, "name": users[u].get("display_name", u)} for u in doctor_usernames]
+                    _display_to_uname.clear()
+                    for u in doctor_usernames:
+                        disp = users[u].get("display_name", u)
+                        _display_to_uname["".join(ch for ch in str(disp).lower() if ch.isalnum())] = u
+                    st.success(f"Deleted doctor {removed.get('name')} and related appointments.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to delete doctor: {e}")
 
-    # Doctors overview
-    st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-    st.markdown("### 👨‍⚕ All Doctors Overview")
-    if not doctors_df.empty:
-        # use dataframe to allow horizontal expansion under admin width
-        st.dataframe(doctors_df, use_container_width=True)
-    else:
-        st.write("No doctors data available.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Doctors overview
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        st.markdown("### 👨‍⚕ All Doctors Overview")
+        if not doctors_df.empty:
+            st.dataframe(doctors_df, use_container_width=True)
+        else:
+            st.write("No doctors data available.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# End of file
